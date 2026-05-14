@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#6366f1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="体重管理" />
+  <meta name="description" content="毎日の体重とカロリーを記録して目標達成をサポートするPWAアプリ" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>体重管理 | Weight & Calorie Tracker</title>
+</head>
+<body>
+  <!-- アプリヘッダー -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 1 18 0" />
+            <path d="M12 12l3-4" />
+            <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1 id="page-title">ホーム</h1>
+          <p id="page-subtitle">今日の状態を確認しましょう</p>
+        </div>
+      </div>
+      <button class="theme-toggle" id="themeToggle" aria-label="テーマ切替">
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+        </svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="app-main">
+
+    <!-- ホーム画面 -->
+    <section class="view view-home active" data-view="home">
+      <!-- 目標達成度カード -->
+      <div class="card hero-card">
+        <div class="hero-top">
+          <div>
+            <span class="hero-label">目標達成度</span>
+            <h2 class="hero-progress" id="goalProgressText">--%</h2>
+            <p class="hero-sub" id="goalProgressSub">目標体重を設定してください</p>
+          </div>
+          <div class="ring-wrap">
+            <svg class="ring" viewBox="0 0 120 120">
+              <circle class="ring-bg" cx="60" cy="60" r="52" />
+              <circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="326.7" />
+            </svg>
+            <div class="ring-center">
+              <span id="ringPercent">0</span><small>%</small>
+            </div>
+          </div>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <span class="stat-label">現在</span>
+            <strong id="currentWeightStat">-- kg</strong>
+          </div>
+          <div class="hero-stat">
+            <span class="stat-label">目標</span>
+            <strong id="targetWeightStat">-- kg</strong>
+          </div>
+          <div class="hero-stat">
+            <span class="stat-label">差分</span>
+            <strong id="diffWeightStat">-- kg</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1週間カロリー収支 -->
+      <div class="card calorie-card">
+        <div class="card-head">
+          <h3>今週のカロリー収支</h3>
+          <span class="badge" id="weekRangeBadge">--</span>
+        </div>
+        <div class="calorie-main">
+          <div class="calorie-remain">
+            <span class="label">残り摂取可能</span>
+            <strong id="remainCalText">--</strong>
+            <small>kcal</small>
+          </div>
+          <div class="calorie-bar-wrap">
+            <div class="calorie-bar">
+              <div class="calorie-bar-fill" id="calorieBarFill"></div>
+            </div>
+            <div class="calorie-meta">
+              <span>摂取: <b id="consumedCalText">0</b> kcal</span>
+              <span>予算: <b id="budgetCalText">0</b> kcal</span>
+            </div>
+          </div>
+        </div>
+        <div class="calorie-days" id="calorieDays"></div>
+      </div>
+
+      <!-- クイックアクション -->
+      <div class="quick-grid">
+        <button class="quick-btn" data-quick="weight">
+          <span class="quick-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 4h12l1 16H5L6 4z"/>
+              <path d="M12 9v5"/>
+              <path d="M9 9h6"/>
+            </svg>
+          </span>
+          <span>体重を記録</span>
+        </button>
+        <button class="quick-btn" data-quick="meal">
+          <span class="quick-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 11h18"/>
+              <path d="M12 11v9"/>
+              <path d="M6 11a6 6 0 0 1 12 0"/>
+            </svg>
+          </span>
+          <span>食事を記録</span>
+        </button>
+      </div>
+
+      <!-- 今日の概要 -->
+      <div class="card today-card">
+        <div class="card-head">
+          <h3>今日の記録</h3>
+          <span class="date-text" id="todayDateText">--</span>
+        </div>
+        <div class="today-grid">
+          <div class="today-item">
+            <span class="ti-label">体重</span>
+            <strong id="todayWeight">未入力</strong>
+          </div>
+          <div class="today-item">
+            <span class="ti-label">摂取カロリー</span>
+            <strong id="todayCal">0 kcal</strong>
+          </div>
+          <div class="today-item">
+            <span class="ti-label">食事回数</span>
+            <strong id="todayMeals">0 件</strong>
+          </div>
+          <div class="today-item">
+            <span class="ti-label">体脂肪率</span>
+            <strong id="todayBodyFat">未入力</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 記録画面 -->
+    <section class="view view-record" data-view="record">
+      <div class="card">
+        <div class="card-head">
+          <h3>日付選択</h3>
+        </div>
+        <input type="date" id="recordDate" class="date-input" />
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>体重・体脂肪率</h3>
+        </div>
+        <div class="form-row">
+          <label class="field">
+            <span>体重 (kg)</span>
+            <input type="number" inputmode="decimal" step="0.1" id="inputWeight" placeholder="例: 65.4" />
+          </label>
+          <label class="field">
+            <span>体脂肪率 (%)</span>
+            <input type="number" inputmode="decimal" step="0.1" id="inputBodyFat" placeholder="例: 20.5" />
+          </label>
+        </div>
+        <button class="btn btn-primary btn-block" id="saveWeightBtn">体重を保存</button>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>食事の追加</h3>
+        </div>
+        <div class="form-row">
+          <label class="field flex-2">
+            <span>食事名</span>
+            <input type="text" id="inputMealName" placeholder="例: 朝食 / おにぎり" />
+          </label>
+          <label class="field">
+            <span>カロリー (kcal)</span>
+            <input type="number" inputmode="numeric" id="inputMealCal" placeholder="例: 500" />
+          </label>
+        </div>
+        <button class="btn btn-primary btn-block" id="addMealBtn">食事を追加</button>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>当日の食事一覧</h3>
+          <span class="badge" id="mealsTotalBadge">0 kcal</span>
+        </div>
+        <ul class="meal-list" id="mealList">
+          <li class="empty">食事が登録されていません</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- グラフ画面 -->
+    <section class="view view-graph" data-view="graph">
+      <div class="segment" id="rangeSegment">
+        <button class="seg-btn active" data-range="7">7日</button>
+        <button class="seg-btn" data-range="30">30日</button>
+        <button class="seg-btn" data-range="90">90日</button>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>体重の推移</h3>
+          <span class="trend" id="weightTrend">--</span>
+        </div>
+        <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>カロリーの推移</h3>
+          <span class="trend" id="calTrend">--</span>
+        </div>
+        <div class="chart-wrap"><canvas id="calChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>体脂肪率の推移</h3>
+          <span class="trend" id="bfTrend">--</span>
+        </div>
+        <div class="chart-wrap"><canvas id="bfChart"></canvas></div>
+      </div>
+    </section>
+
+    <!-- 設定画面 -->
+    <section class="view view-settings" data-view="settings">
+      <div class="card">
+        <div class="card-head">
+          <h3>身体情報</h3>
+        </div>
+        <div class="form-row">
+          <label class="field">
+            <span>身長 (cm)</span>
+            <input type="number" inputmode="decimal" step="0.1" id="settingHeight" placeholder="例: 170" />
+          </label>
+          <label class="field">
+            <span>開始体重 (kg)</span>
+            <input type="number" inputmode="decimal" step="0.1" id="settingStartWeight" placeholder="例: 70.0" />
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>目標設定</h3>
+        </div>
+        <div class="form-row">
+          <label class="field">
+            <span>目標体重 (kg)</span>
+            <input type="number" inputmode="decimal" step="0.1" id="settingTargetWeight" placeholder="例: 60.0" />
+          </label>
+          <label class="field">
+            <span>目標体脂肪率 (%)</span>
+            <input type="number" inputmode="decimal" step="0.1" id="settingTargetBodyFat" placeholder="例: 15.0" />
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="field">
+            <span>目標日</span>
+            <input type="date" id="settingTargetDate" />
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>カロリー目標</h3>
+        </div>
+        <div class="form-row">
+          <label class="field">
+            <span>1日の摂取カロリー目標 (kcal)</span>
+            <input type="number" inputmode="numeric" id="settingDailyCal" placeholder="例: 2000" />
+          </label>
+        </div>
+        <p class="hint" id="weeklyBudgetHint">1週間の予算: -- kcal</p>
+      </div>
+
+      <button class="btn btn-primary btn-block" id="saveSettingsBtn">設定を保存</button>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>データ管理</h3>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="exportBtn">エクスポート</button>
+          <button class="btn btn-secondary" id="importBtn">インポート</button>
+          <input type="file" id="importFile" accept="application/json" hidden />
+        </div>
+        <button class="btn btn-danger btn-block" id="resetBtn">全データを削除</button>
+      </div>
+
+      <p class="app-meta">体重管理アプリ v1.0 · データはこの端末にのみ保存されます</p>
+    </section>
+  </main>
+
+  <!-- ボトムナビゲーション -->
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="nav-btn active" data-target="home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 11l9-8 9 8"/>
+        <path d="M5 10v10h14V10"/>
+      </svg>
+      <span>ホーム</span>
+    </button>
+    <button class="nav-btn" data-target="record">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+      <span>記録</span>
+    </button>
+    <button class="nav-btn" data-target="graph">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 3v18h18"/>
+        <path d="M7 14l4-4 3 3 5-7"/>
+      </svg>
+      <span>グラフ</span>
+    </button>
+    <button class="nav-btn" data-target="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1A2 2 0 1 1 4.4 17l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1A2 2 0 1 1 7 4.4l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1A2 2 0 1 1 19.6 7l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
+      </svg>
+      <span>設定</span>
+    </button>
+  </nav>
+
+  <!-- トースト通知 -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+    }
+  </script>
+</body>
+</html>
