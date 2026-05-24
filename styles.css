@@ -1063,6 +1063,33 @@ button:focus-visible {
   transform: translateX(-50%) translateY(0) scale(1);
 }
 
+.import-status {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  display: none;
+}
+.import-status:not(:empty) {
+  display: block;
+}
+.import-status.is-loading {
+  display: block;
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+}
+.import-status.is-success {
+  display: block;
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+  color: var(--color-success);
+}
+.import-status.is-error {
+  display: block;
+  background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+  color: var(--color-danger);
+}
+
 .app-meta {
   text-align: center;
   font-size: 11px;

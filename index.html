@@ -308,8 +308,9 @@
           <button class="btn btn-secondary" id="importBtn">インポート</button>
           <input type="file" id="importFile" accept="application/json" hidden />
         </div>
-        <button class="btn btn-secondary btn-block" id="importHistoryBtn">履歴データを取り込む</button>
-        <p class="hint">体重の記録は端末ごとに保存されます。PCで取り込んだデータは、スマホでこのボタンを押すと反映されます。</p>
+        <button type="button" class="btn btn-secondary btn-block" id="importHistoryBtn">履歴データを取り込む</button>
+        <p class="import-status" id="importHistoryStatus" aria-live="polite"></p>
+        <p class="hint">体重の記録は端末ごとに保存されます。取り込み後はホーム・グラフで確認できます。</p>
         <button class="btn btn-danger btn-block" id="resetBtn">全データを削除</button>
       </div>
 
@@ -353,7 +354,7 @@
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=6"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));

@@ -45,6 +45,13 @@ def main():
     json_path.write_text(json.dumps(import_data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"JSON: {count} records -> {json_path}")
 
+    bundle_path = ROOT / "weight-bundle.js"
+    bundle_path.write_text(
+        "window.WEIGHT_IMPORT_RECORDS = " + json.dumps(records, ensure_ascii=False) + ";\n",
+        encoding="utf-8",
+    )
+    print(f"Bundle: {count} records -> {bundle_path}")
+
     records_js = json.dumps(records, ensure_ascii=False)
     html_path = ROOT / "import-weights.html"
     html_path.write_text(

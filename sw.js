@@ -1,5 +1,5 @@
 /* Service Worker for 体重管理 PWA */
-const CACHE_NAME = "weight-tracker-v5";
+const CACHE_NAME = "weight-tracker-v6";
 const ASSETS = [
   "./",
   "./index.html",
@@ -35,9 +35,33 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+function networkFirst(req) {
+  return fetch(req)
+    .then((res) => {
+      if (res && res.ok) {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((c) => c.put(req, copy));
+      }
+      return res;
+    })
+    .catch(() => caches.match(req));
+}
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
+
+  const url = new URL(req.url);
+  const isAppCode =
+    url.pathname.endsWith("/app.js") ||
+    url.pathname.endsWith("/index.html") ||
+    url.pathname.endsWith("/weight-import.json") ||
+    url.pathname.endsWith("/weight-bundle.js");
+
+  if (isAppCode) {
+    event.respondWith(networkFirst(req));
+    return;
+  }
 
   // Network-first for HTML so updates are picked up; cache fallback offline.
   if (req.mode === "navigate" || req.destination === "document") {

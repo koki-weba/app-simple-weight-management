@@ -153,7 +153,12 @@
     }
   }
   function saveData() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.warn("save error", e);
+      throw new Error("データの保存に失敗しました（ストレージ容量不足の可能性）");
+    }
   }
 
   let state = loadData();
@@ -525,13 +530,60 @@
     return { merged, added, updated };
   }
 
+  function setImportHistoryStatus(msg, kind = "") {
+    const el = $("#importHistoryStatus");
+    if (!el) return;
+    el.textContent = msg;
+    el.className = "import-status" + (kind ? ` is-${kind}` : "");
+  }
+
+  function countWeightRecords() {
+    return Object.keys(state.records).filter((d) => state.records[d].weight != null).length;
+  }
+
+  function loadWeightBundleScript() {
+    return new Promise((resolve, reject) => {
+      if (window.WEIGHT_IMPORT_RECORDS) {
+        resolve(window.WEIGHT_IMPORT_RECORDS);
+        return;
+      }
+      const s = document.createElement("script");
+      s.src = `weight-bundle.js?t=${Date.now()}`;
+      s.onload = () => {
+        if (window.WEIGHT_IMPORT_RECORDS) resolve(window.WEIGHT_IMPORT_RECORDS);
+        else reject(new Error("bundle empty"));
+      };
+      s.onerror = () => reject(new Error("bundle load failed"));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function loadHistoryRecords() {
+    const url = new URL("weight-import.json", window.location.href);
+    url.searchParams.set("t", String(Date.now()));
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data.records) throw new Error("invalid json");
+    return data.records;
+  }
+
+  async function fetchHistoryRecords() {
+    try {
+      return await loadHistoryRecords();
+    } catch (err) {
+      console.warn("weight-import.json failed, trying bundle", err);
+      return loadWeightBundleScript();
+    }
+  }
+
   function applyImportedRecords(records) {
     const { merged, added, updated } = mergeRecords(state.records, records);
     state.records = merged;
     saveData();
     renderAll();
     fillSettingsForm();
-    return { added, updated };
+    return { added, updated, total: countWeightRecords() };
   }
 
   // -----------------------------
@@ -576,30 +628,33 @@
 
     $("#importBtn").addEventListener("click", () => $("#importFile").click());
 
-    $("#importHistoryBtn").addEventListener("click", async () => {
-      if (
-        !confirm(
-          "サーバー上の体重履歴（weight-import.json）を取り込みます。\n同じ日付の体重は上書きされますが、設定と食事データは保持されます。続行しますか？"
-        )
-      ) {
-        return;
-      }
-      const btn = $("#importHistoryBtn");
-      btn.disabled = true;
-      try {
-        const res = await fetch("./weight-import.json", { cache: "no-store" });
-        if (!res.ok) throw new Error("fetch failed");
-        const data = await res.json();
-        if (!data.records) throw new Error("invalid");
-        const { added, updated } = applyImportedRecords(data.records);
-        toast(`履歴を取り込みました（新規${added}件・更新${updated}件）`);
-      } catch (err) {
-        console.warn("history import error", err);
-        toast("履歴の取り込みに失敗しました");
-      } finally {
-        btn.disabled = false;
-      }
-    });
+    const importHistoryBtn = $("#importHistoryBtn");
+    if (importHistoryBtn) {
+      importHistoryBtn.addEventListener("click", async () => {
+        const btn = importHistoryBtn;
+        btn.disabled = true;
+        setImportHistoryStatus("履歴を読み込み中…", "loading");
+        try {
+          const records = await fetchHistoryRecords();
+          const before = countWeightRecords();
+          const { added, updated, total } = applyImportedRecords(records);
+          const msg = `取り込み完了: 新規${added}件・更新${updated}件（体重記録 合計${total}件）`;
+          setImportHistoryStatus(msg, "success");
+          toast("履歴を取り込みました");
+          if (before === 0 && total > 0) {
+            currentView = "";
+            switchView("home");
+          }
+        } catch (err) {
+          console.warn("history import error", err);
+          const detail = err && err.message ? `（${err.message}）` : "";
+          setImportHistoryStatus(`取り込みに失敗しました${detail}`, "error");
+          toast("履歴の取り込みに失敗しました");
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    }
 
     $("#importFile").addEventListener("change", (e) => {
       const file = e.target.files[0];
