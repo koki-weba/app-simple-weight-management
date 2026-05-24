@@ -503,6 +503,38 @@
   }
 
   // -----------------------------
+  // インポート（マージ）
+  // -----------------------------
+  function mergeRecords(existing, incoming) {
+    const merged = { ...existing };
+    let added = 0;
+    let updated = 0;
+    for (const [date, rec] of Object.entries(incoming)) {
+      if (merged[date]) {
+        merged[date] = {
+          ...merged[date],
+          weight: rec.weight,
+          bodyFat: merged[date].bodyFat ?? rec.bodyFat,
+        };
+        updated++;
+      } else {
+        merged[date] = rec;
+        added++;
+      }
+    }
+    return { merged, added, updated };
+  }
+
+  function applyImportedRecords(records) {
+    const { merged, added, updated } = mergeRecords(state.records, records);
+    state.records = merged;
+    saveData();
+    renderAll();
+    fillSettingsForm();
+    return { added, updated };
+  }
+
+  // -----------------------------
   // 設定
   // -----------------------------
   function initSettingsView() {
@@ -543,6 +575,32 @@
     });
 
     $("#importBtn").addEventListener("click", () => $("#importFile").click());
+
+    $("#importHistoryBtn").addEventListener("click", async () => {
+      if (
+        !confirm(
+          "サーバー上の体重履歴（weight-import.json）を取り込みます。\n同じ日付の体重は上書きされますが、設定と食事データは保持されます。続行しますか？"
+        )
+      ) {
+        return;
+      }
+      const btn = $("#importHistoryBtn");
+      btn.disabled = true;
+      try {
+        const res = await fetch("./weight-import.json", { cache: "no-store" });
+        if (!res.ok) throw new Error("fetch failed");
+        const data = await res.json();
+        if (!data.records) throw new Error("invalid");
+        const { added, updated } = applyImportedRecords(data.records);
+        toast(`履歴を取り込みました（新規${added}件・更新${updated}件）`);
+      } catch (err) {
+        console.warn("history import error", err);
+        toast("履歴の取り込みに失敗しました");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
     $("#importFile").addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (!file) return;

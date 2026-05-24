@@ -1,5 +1,5 @@
 /* Service Worker for 体重管理 PWA */
-const CACHE_NAME = "weight-tracker-v4";
+const CACHE_NAME = "weight-tracker-v5";
 const ASSETS = [
   "./",
   "./index.html",
