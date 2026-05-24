@@ -126,7 +126,7 @@
               <path d="M6 11a6 6 0 0 1 12 0"/>
             </svg>
           </span>
-          <span>食事を記録</span>
+          <span>カロリーを記録</span>
         </button>
       </div>
 
@@ -145,14 +145,6 @@
             <span class="ti-label">摂取カロリー</span>
             <strong id="todayCal">0 kcal</strong>
           </div>
-          <div class="today-item">
-            <span class="ti-label">食事回数</span>
-            <strong id="todayMeals">0 件</strong>
-          </div>
-          <div class="today-item">
-            <span class="ti-label">体脂肪率</span>
-            <strong id="todayBodyFat">未入力</strong>
-          </div>
         </div>
       </div>
     </section>
@@ -168,55 +160,35 @@
 
       <div class="card">
         <div class="card-head">
-          <h3>体重・体脂肪率</h3>
+          <h3>体重</h3>
         </div>
-        <div class="form-row">
-          <label class="field">
-            <span>体重 (kg)</span>
-            <input type="number" inputmode="decimal" step="0.1" id="inputWeight" placeholder="例: 65.4" />
-          </label>
-          <label class="field">
-            <span>体脂肪率 (%)</span>
-            <input type="number" inputmode="decimal" step="0.1" id="inputBodyFat" placeholder="例: 20.5" />
-          </label>
-        </div>
+        <label class="field">
+          <span>体重 (kg)</span>
+          <input type="number" inputmode="decimal" step="0.1" id="inputWeight" placeholder="例: 65.4" />
+        </label>
         <button class="btn btn-primary btn-block" id="saveWeightBtn">体重を保存</button>
       </div>
 
       <div class="card">
         <div class="card-head">
-          <h3>食事の追加</h3>
+          <h3>摂取カロリー</h3>
         </div>
-        <div class="form-row">
-          <label class="field flex-2">
-            <span>食事名</span>
-            <input type="text" id="inputMealName" placeholder="例: 朝食 / おにぎり" />
-          </label>
-          <label class="field">
-            <span>カロリー (kcal)</span>
-            <input type="number" inputmode="numeric" id="inputMealCal" placeholder="例: 500" />
-          </label>
-        </div>
-        <button class="btn btn-primary btn-block" id="addMealBtn">食事を追加</button>
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <h3>当日の食事一覧</h3>
-          <span class="badge" id="mealsTotalBadge">0 kcal</span>
-        </div>
-        <ul class="meal-list" id="mealList">
-          <li class="empty">食事が登録されていません</li>
-        </ul>
+        <label class="field">
+          <span>その日の合計摂取カロリー (kcal)</span>
+          <input type="number" inputmode="numeric" id="inputDailyCal" placeholder="例: 1800" />
+        </label>
+        <button class="btn btn-primary btn-block" id="saveCalBtn">カロリーを保存</button>
       </div>
     </section>
 
     <!-- グラフ画面 -->
     <section class="view view-graph" data-view="graph">
-      <div class="segment" id="rangeSegment">
+      <div class="segment segment-scroll" id="rangeSegment">
         <button class="seg-btn active" data-range="7">7日</button>
         <button class="seg-btn" data-range="30">30日</button>
         <button class="seg-btn" data-range="90">90日</button>
+        <button class="seg-btn" data-range="180">180日</button>
+        <button class="seg-btn" data-range="365">365日</button>
       </div>
 
       <div class="card">
@@ -235,13 +207,23 @@
         <div class="chart-wrap"><canvas id="calChart"></canvas></div>
       </div>
 
-      <div class="card">
+      <div class="card chart-weekly" id="avgWeightChartCard" hidden>
         <div class="card-head">
-          <h3>体脂肪率の推移</h3>
-          <span class="trend" id="bfTrend">--</span>
+          <h3>1週間の平均体重</h3>
+          <span class="trend" id="avgWeightTrend">--</span>
         </div>
-        <div class="chart-wrap"><canvas id="bfChart"></canvas></div>
+        <div class="chart-wrap"><canvas id="avgWeightChart"></canvas></div>
       </div>
+
+      <div class="card chart-weekly" id="avgCalChartCard" hidden>
+        <div class="card-head">
+          <h3>1週間の平均摂取カロリー</h3>
+          <span class="trend" id="avgCalTrend">--</span>
+        </div>
+        <div class="chart-wrap"><canvas id="avgCalChart"></canvas></div>
+      </div>
+
+      <p class="hint chart-weekly-hint" id="weeklyChartHint" hidden>1週間の平均グラフは30日以上の表示で利用できます</p>
     </section>
 
     <!-- 設定画面 -->
@@ -271,12 +253,6 @@
             <span>目標体重 (kg)</span>
             <input type="number" inputmode="decimal" step="0.1" id="settingTargetWeight" placeholder="例: 60.0" />
           </label>
-          <label class="field">
-            <span>目標体脂肪率 (%)</span>
-            <input type="number" inputmode="decimal" step="0.1" id="settingTargetBodyFat" placeholder="例: 15.0" />
-          </label>
-        </div>
-        <div class="form-row">
           <label class="field">
             <span>目標日</span>
             <input type="date" id="settingTargetDate" />
@@ -354,7 +330,7 @@
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));

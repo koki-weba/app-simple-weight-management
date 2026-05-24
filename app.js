@@ -16,12 +16,13 @@
       height: null,
       startWeight: null,
       targetWeight: null,
-      targetBodyFat: null,
       targetDate: null,
       dailyCalGoal: 2000,
     },
-    records: {}, // { 'YYYY-MM-DD': { weight, bodyFat, meals: [{id, name, kcal, time}] } }
+    records: {}, // { 'YYYY-MM-DD': { weight, dailyCalories } }
   };
+
+  const WEEKLY_AVG_MIN_RANGE = 30;
 
   // -----------------------------
   // ユーティリティ
@@ -138,6 +139,29 @@
   // -----------------------------
   // ストア
   // -----------------------------
+  function normalizeRecord(rec) {
+    if (!rec) return { weight: null, dailyCalories: null };
+    let dailyCalories =
+      rec.dailyCalories != null && rec.dailyCalories !== ""
+        ? Number(rec.dailyCalories)
+        : null;
+    if ((dailyCalories == null || isNaN(dailyCalories)) && rec.meals?.length) {
+      dailyCalories = rec.meals.reduce((s, m) => s + (Number(m.kcal) || 0), 0);
+    }
+    if (dailyCalories != null && isNaN(dailyCalories)) dailyCalories = null;
+    const weight =
+      rec.weight != null && rec.weight !== "" ? Number(rec.weight) : null;
+    return { weight, dailyCalories };
+  }
+
+  function normalizeRecords(records) {
+    const out = {};
+    for (const [date, rec] of Object.entries(records || {})) {
+      out[date] = normalizeRecord(rec);
+    }
+    return out;
+  }
+
   function loadData() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -145,7 +169,7 @@
       const parsed = JSON.parse(raw);
       return {
         settings: { ...DEFAULT_DATA.settings, ...(parsed.settings || {}) },
-        records: parsed.records || {},
+        records: normalizeRecords(parsed.records),
       };
     } catch (e) {
       console.warn("data load error", e);
@@ -200,7 +224,7 @@
   // -----------------------------
   const PAGE_TITLES = {
     home: { title: "ホーム", subtitle: "今日の状態を確認しましょう" },
-    record: { title: "記録", subtitle: "体重と食事を記録しましょう" },
+    record: { title: "記録", subtitle: "体重と摂取カロリーを記録しましょう" },
     graph: { title: "グラフ", subtitle: "推移を可視化して確認" },
     settings: { title: "設定", subtitle: "目標と身体情報の設定" },
   };
@@ -236,16 +260,20 @@
   // 計算ヘルパ
   // -----------------------------
   function getRecord(date) {
-    return state.records[date] || { weight: null, bodyFat: null, meals: [] };
+    return state.records[date] || { weight: null, dailyCalories: null };
   }
   function ensureRecord(date) {
-    if (!state.records[date]) state.records[date] = { weight: null, bodyFat: null, meals: [] };
+    if (!state.records[date]) state.records[date] = { weight: null, dailyCalories: null };
     return state.records[date];
   }
   function dayCalories(date) {
     const r = state.records[date];
-    if (!r || !r.meals) return 0;
-    return r.meals.reduce((s, m) => s + (Number(m.kcal) || 0), 0);
+    if (!r) return 0;
+    if (r.dailyCalories != null) return Number(r.dailyCalories) || 0;
+    if (r.meals?.length) {
+      return r.meals.reduce((s, m) => s + (Number(m.kcal) || 0), 0);
+    }
+    return 0;
   }
   function getLatestWeight(beforeDate) {
     const dates = Object.keys(state.records).sort();
@@ -256,15 +284,6 @@
     }
     return null;
   }
-  function getLatestBodyFat() {
-    const dates = Object.keys(state.records).sort();
-    for (let i = dates.length - 1; i >= 0; i--) {
-      const bf = state.records[dates[i]].bodyFat;
-      if (bf != null && bf !== "") return Number(bf);
-    }
-    return null;
-  }
-
   // 目標達成度 (0-100)
   function goalProgress() {
     const target = state.settings.targetWeight;
@@ -288,10 +307,8 @@
 
     const todayRec = getRecord(today);
     $("#todayWeight").textContent = todayRec.weight != null ? `${todayRec.weight} kg` : "未入力";
-    $("#todayBodyFat").textContent = todayRec.bodyFat != null ? `${todayRec.bodyFat} %` : "未入力";
     const cal = dayCalories(today);
     animateNumber($("#todayCal"), cal, { suffix: " kcal" });
-    $("#todayMeals").textContent = `${(todayRec.meals || []).length} 件`;
 
     // ヒーロー (目標達成度)
     const target = state.settings.targetWeight;
@@ -418,43 +435,29 @@
     $("#saveWeightBtn").addEventListener("click", () => {
       const date = dateInput.value || todayStr();
       const weight = parseFloat($("#inputWeight").value);
-      const bodyFat = parseFloat($("#inputBodyFat").value);
-
-      const rec = ensureRecord(date);
-      let updated = false;
-      if (!isNaN(weight)) { rec.weight = +weight.toFixed(1); updated = true; }
-      if (!isNaN(bodyFat)) { rec.bodyFat = +bodyFat.toFixed(1); updated = true; }
-
-      if (!updated) {
-        toast("体重または体脂肪率を入力してください");
+      if (isNaN(weight)) {
+        toast("体重を入力してください");
         return;
       }
+      const rec = ensureRecord(date);
+      rec.weight = +weight.toFixed(1);
       saveData();
       renderAll();
       toast(`${formatJpDate(date)}の体重を保存しました`);
     });
 
-    $("#addMealBtn").addEventListener("click", () => {
+    $("#saveCalBtn").addEventListener("click", () => {
       const date = dateInput.value || todayStr();
-      const name = $("#inputMealName").value.trim();
-      const kcal = parseInt($("#inputMealCal").value, 10);
-      if (!name) return toast("食事名を入力してください");
-      if (isNaN(kcal) || kcal < 0) return toast("カロリーを入力してください");
-
+      const kcal = parseInt($("#inputDailyCal").value, 10);
+      if (isNaN(kcal) || kcal < 0) {
+        toast("摂取カロリーを入力してください");
+        return;
+      }
       const rec = ensureRecord(date);
-      rec.meals = rec.meals || [];
-      const now = new Date();
-      rec.meals.push({
-        id: Date.now() + Math.random().toString(36).slice(2, 6),
-        name,
-        kcal,
-        time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
-      });
+      rec.dailyCalories = kcal;
       saveData();
-      $("#inputMealName").value = "";
-      $("#inputMealCal").value = "";
       renderAll();
-      toast(`${name} (${kcal} kcal) を追加しました`);
+      toast(`${formatJpDate(date)}の摂取カロリー（${kcal.toLocaleString()} kcal）を保存しました`);
     });
   }
 
@@ -462,49 +465,8 @@
     const date = $("#recordDate").value || todayStr();
     const rec = getRecord(date);
     $("#inputWeight").value = rec.weight != null ? rec.weight : "";
-    $("#inputBodyFat").value = rec.bodyFat != null ? rec.bodyFat : "";
-
-    const list = $("#mealList");
-    list.innerHTML = "";
-    const meals = rec.meals || [];
-    if (meals.length === 0) {
-      list.innerHTML = `<li class="empty">食事が登録されていません</li>`;
-    } else {
-      meals.forEach((m) => {
-        const li = document.createElement("li");
-        li.className = "meal-item";
-        li.innerHTML = `
-          <div class="meal-info">
-            <div class="meal-name">${escapeHtml(m.name)}</div>
-            <div class="meal-time">${m.time || ""}</div>
-          </div>
-          <div class="meal-cal">${Number(m.kcal).toLocaleString()} kcal</div>
-          <button class="meal-delete" aria-label="削除" data-mid="${m.id}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-            </svg>
-          </button>`;
-        list.appendChild(li);
-      });
-      list.querySelectorAll(".meal-delete").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const id = btn.dataset.mid;
-          rec.meals = rec.meals.filter((m) => m.id !== id);
-          saveData();
-          renderAll();
-          toast("食事を削除しました");
-        });
-      });
-    }
-    const total = meals.reduce((s, m) => s + Number(m.kcal), 0);
-    $("#mealsTotalBadge").textContent = `${total.toLocaleString()} kcal`;
-  }
-
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-    })[c]);
+    const cal = dayCalories(date);
+    $("#inputDailyCal").value = cal > 0 || rec.dailyCalories != null ? cal : "";
   }
 
   // -----------------------------
@@ -515,15 +477,16 @@
     let added = 0;
     let updated = 0;
     for (const [date, rec] of Object.entries(incoming)) {
+      const incoming = normalizeRecord(rec);
       if (merged[date]) {
         merged[date] = {
           ...merged[date],
-          weight: rec.weight,
-          bodyFat: merged[date].bodyFat ?? rec.bodyFat,
+          weight: incoming.weight ?? merged[date].weight,
+          dailyCalories: incoming.dailyCalories ?? merged[date].dailyCalories,
         };
         updated++;
       } else {
-        merged[date] = rec;
+        merged[date] = incoming;
         added++;
       }
     }
@@ -579,7 +542,7 @@
 
   function applyImportedRecords(records) {
     const { merged, added, updated } = mergeRecords(state.records, records);
-    state.records = merged;
+    state.records = normalizeRecords(merged);
     saveData();
     renderAll();
     fillSettingsForm();
@@ -594,14 +557,12 @@
       const h = parseFloat($("#settingHeight").value);
       const sw = parseFloat($("#settingStartWeight").value);
       const tw = parseFloat($("#settingTargetWeight").value);
-      const tbf = parseFloat($("#settingTargetBodyFat").value);
       const td = $("#settingTargetDate").value;
       const dc = parseInt($("#settingDailyCal").value, 10);
 
       state.settings.height = isNaN(h) ? null : h;
       state.settings.startWeight = isNaN(sw) ? null : sw;
       state.settings.targetWeight = isNaN(tw) ? null : tw;
-      state.settings.targetBodyFat = isNaN(tbf) ? null : tbf;
       state.settings.targetDate = td || null;
       state.settings.dailyCalGoal = isNaN(dc) ? 0 : dc;
 
@@ -667,7 +628,7 @@
           if (!confirm("既存のデータは上書きされます。続行しますか？")) return;
           state = {
             settings: { ...DEFAULT_DATA.settings, ...data.settings },
-            records: data.records,
+            records: normalizeRecords(data.records),
           };
           saveData();
           renderAll();
@@ -696,7 +657,6 @@
     $("#settingHeight").value = s.height ?? "";
     $("#settingStartWeight").value = s.startWeight ?? "";
     $("#settingTargetWeight").value = s.targetWeight ?? "";
-    $("#settingTargetBodyFat").value = s.targetBodyFat ?? "";
     $("#settingTargetDate").value = s.targetDate ?? "";
     $("#settingDailyCal").value = s.dailyCalGoal ?? "";
     $("#weeklyBudgetHint").textContent = `1週間の予算: ${((s.dailyCalGoal || 0) * 7).toLocaleString()} kcal`;
@@ -706,7 +666,7 @@
   // チャート
   // -----------------------------
   let chartRange = 7;
-  let weightChart, calChart, bfChart;
+  let weightChart, calChart, avgWeightChart, avgCalChart;
 
   function buildSeries(days) {
     const today = new Date();
@@ -716,15 +676,56 @@
       const d = addDays(today, -i);
       const key = formatDate(d);
       const rec = state.records[key] || {};
+      const kcal = dayCalories(key);
       result.push({
         date: key,
-        label: `${d.getMonth() + 1}/${d.getDate()}`,
+        label: formatChartLabel(d),
         weight: rec.weight ?? null,
-        bodyFat: rec.bodyFat ?? null,
-        kcal: dayCalories(key) || null,
+        kcal: kcal > 0 ? kcal : null,
       });
     }
     return result;
+  }
+
+  function formatChartLabel(d) {
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  }
+
+  function buildWeeklyAvgSeries(days) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const result = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = addDays(today, -i);
+      const key = formatDate(d);
+      let weightSum = 0;
+      let weightCount = 0;
+      let kcalSum = 0;
+      for (let w = 0; w < 7; w++) {
+        const wd = formatDate(addDays(d, -6 + w));
+        const rec = state.records[wd];
+        const weight = rec?.weight;
+        if (weight != null && weight !== "") {
+          weightSum += Number(weight);
+          weightCount++;
+        }
+        kcalSum += dayCalories(wd);
+      }
+      result.push({
+        date: key,
+        label: formatChartLabel(d),
+        avgWeight: weightCount > 0 ? +(weightSum / weightCount).toFixed(1) : null,
+        avgKcal: Math.round(kcalSum / 7),
+      });
+    }
+    return result;
+  }
+
+  function toggleWeeklyCharts() {
+    const show = chartRange >= WEEKLY_AVG_MIN_RANGE;
+    $("#avgWeightChartCard").hidden = !show;
+    $("#avgCalChartCard").hidden = !show;
+    $("#weeklyChartHint").hidden = show;
   }
 
   function getChartColors() {
@@ -740,6 +741,7 @@
       bgFill: isDark ? "rgba(129,140,248,0.18)" : "rgba(99,102,241,0.15)",
       accentFill: isDark ? "rgba(244,114,182,0.18)" : "rgba(236,72,153,0.15)",
       successFill: isDark ? "rgba(16,185,129,0.18)" : "rgba(16,185,129,0.15)",
+      warnFill: isDark ? "rgba(245,158,11,0.18)" : "rgba(245,158,11,0.15)",
     };
   }
 
@@ -807,13 +809,39 @@
         options: opt,
       });
     }
-    if (!bfChart) {
-      bfChart = new Chart($("#bfChart"), {
+    if (!avgWeightChart) {
+      avgWeightChart = new Chart($("#avgWeightChart"), {
         type: "line",
-        data: { labels: [], datasets: [makeDataset("体脂肪(%)", colors.success, colors.successFill)] },
+        data: { labels: [], datasets: [makeDataset("週平均体重(kg)", colors.success, colors.successFill)] },
         options: opt,
       });
     }
+    if (!avgCalChart) {
+      avgCalChart = new Chart($("#avgCalChart"), {
+        type: "line",
+        data: { labels: [], datasets: [makeDataset("週平均摂取(kcal)", colors.warn, colors.warnFill)] },
+        options: opt,
+      });
+    }
+  }
+
+  function applyChartTheme(chart, colors, datasetIndex = 0) {
+    const ds = chart.data.datasets[datasetIndex];
+    chart.options.scales.x.ticks.color = colors.text;
+    chart.options.scales.y.ticks.color = colors.text;
+    chart.options.scales.x.grid.color = colors.grid;
+    chart.options.scales.y.grid.color = colors.grid;
+    chart.update();
+  }
+
+  function updateLineChart(chart, labels, data, colors, borderColor, fillColor) {
+    chart.data.labels = labels;
+    const ds = chart.data.datasets[0];
+    ds.data = data;
+    ds.borderColor = borderColor;
+    ds.backgroundColor = fillColor;
+    ds.pointBackgroundColor = borderColor;
+    applyChartTheme(chart, colors);
   }
 
   function trendBadge(values) {
@@ -829,51 +857,42 @@
     if (typeof Chart === "undefined") return;
     ensureCharts();
     const colors = getChartColors();
+    const warnFill = colors.warnFill || (document.documentElement.getAttribute("data-theme") === "dark"
+      ? "rgba(245,158,11,0.18)"
+      : "rgba(245,158,11,0.15)");
+
     const series = buildSeries(chartRange);
     const labels = series.map((s) => s.label);
 
-    // 体重
-    weightChart.data.labels = labels;
-    weightChart.data.datasets[0].data = series.map((s) => s.weight);
-    weightChart.data.datasets[0].borderColor = colors.primary;
-    weightChart.data.datasets[0].backgroundColor = colors.bgFill;
-    weightChart.data.datasets[0].pointBackgroundColor = colors.primary;
-    weightChart.options.scales.x.ticks.color = colors.text;
-    weightChart.options.scales.y.ticks.color = colors.text;
-    weightChart.options.scales.x.grid.color = colors.grid;
-    weightChart.options.scales.y.grid.color = colors.grid;
-    weightChart.update();
+    updateLineChart(weightChart, labels, series.map((s) => s.weight), colors, colors.primary, colors.bgFill);
+    updateLineChart(calChart, labels, series.map((s) => s.kcal), colors, colors.accent, colors.accentFill);
 
-    // カロリー
-    calChart.data.labels = labels;
-    calChart.data.datasets[0].data = series.map((s) => s.kcal);
-    calChart.data.datasets[0].borderColor = colors.accent;
-    calChart.data.datasets[0].backgroundColor = colors.accentFill;
-    calChart.data.datasets[0].pointBackgroundColor = colors.accent;
-    calChart.options.scales.x.ticks.color = colors.text;
-    calChart.options.scales.y.ticks.color = colors.text;
-    calChart.options.scales.x.grid.color = colors.grid;
-    calChart.options.scales.y.grid.color = colors.grid;
-    calChart.update();
+    setTrend("#weightTrend", trendBadge(series.map((s) => s.weight)), "kg");
+    setTrend("#calTrend", trendBadge(series.map((s) => s.kcal)), "kcal");
 
-    // 体脂肪
-    bfChart.data.labels = labels;
-    bfChart.data.datasets[0].data = series.map((s) => s.bodyFat);
-    bfChart.data.datasets[0].borderColor = colors.success;
-    bfChart.data.datasets[0].backgroundColor = colors.successFill;
-    bfChart.data.datasets[0].pointBackgroundColor = colors.success;
-    bfChart.options.scales.x.ticks.color = colors.text;
-    bfChart.options.scales.y.ticks.color = colors.text;
-    bfChart.options.scales.x.grid.color = colors.grid;
-    bfChart.options.scales.y.grid.color = colors.grid;
-    bfChart.update();
-
-    const wt = trendBadge(series.map((s) => s.weight));
-    const ct = trendBadge(series.map((s) => s.kcal));
-    const bt = trendBadge(series.map((s) => s.bodyFat));
-    setTrend("#weightTrend", wt, "kg");
-    setTrend("#calTrend", ct, "kcal");
-    setTrend("#bfTrend", bt, "%");
+    toggleWeeklyCharts();
+    if (chartRange >= WEEKLY_AVG_MIN_RANGE) {
+      const avgSeries = buildWeeklyAvgSeries(chartRange);
+      const avgLabels = avgSeries.map((s) => s.label);
+      updateLineChart(
+        avgWeightChart,
+        avgLabels,
+        avgSeries.map((s) => s.avgWeight),
+        colors,
+        colors.success,
+        colors.successFill
+      );
+      updateLineChart(
+        avgCalChart,
+        avgLabels,
+        avgSeries.map((s) => s.avgKcal),
+        colors,
+        colors.warn,
+        warnFill
+      );
+      setTrend("#avgWeightTrend", trendBadge(avgSeries.map((s) => s.avgWeight)), "kg");
+      setTrend("#avgCalTrend", trendBadge(avgSeries.map((s) => s.avgKcal)), "kcal");
+    }
   }
 
   function setTrend(sel, t, unit) {
@@ -894,7 +913,15 @@
   // -----------------------------
   // 初期化
   // -----------------------------
+  function migrateLegacyStorage() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw || (!raw.includes('"meals"') && !raw.includes('"bodyFat"'))) return;
+    state.records = normalizeRecords(state.records);
+    saveData();
+  }
+
   function init() {
+    migrateLegacyStorage();
     initTheme();
     attachRipples();
     fillSettingsForm();
@@ -911,7 +938,7 @@
         if (b.dataset.quick === "weight") {
           setTimeout(() => $("#inputWeight").focus(), 200);
         } else {
-          setTimeout(() => $("#inputMealName").focus(), 200);
+          setTimeout(() => $("#inputDailyCal").focus(), 200);
         }
       });
     });

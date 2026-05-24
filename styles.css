@@ -934,6 +934,18 @@ button:focus-visible {
   border: 1px solid var(--border-soft);
   box-shadow: var(--shadow-sm);
 }
+.segment-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.segment-scroll::-webkit-scrollbar { display: none; }
+.segment-scroll .seg-btn {
+  flex: 0 0 auto;
+  min-width: 3.4rem;
+  padding: 10px 11px;
+  font-size: 12px;
+}
 .seg-btn {
   flex: 1;
   background: transparent;
@@ -944,6 +956,10 @@ button:focus-visible {
   font-size: 13px;
   color: var(--text-sub);
   transition: 0.2s;
+}
+.chart-weekly-hint {
+  margin: -6px 0 14px;
+  text-align: center;
 }
 .seg-btn.active {
   background: var(--grad);
@@ -1109,7 +1125,7 @@ button:focus-visible {
 
 @media (min-width: 720px) {
   .quick-grid { grid-template-columns: repeat(2, 1fr); }
-  .today-grid { grid-template-columns: repeat(4, 1fr); }
+  .today-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* スクロールバー */
