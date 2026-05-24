@@ -782,11 +782,8 @@
       borderWidth: 2.5,
       tension: 0.35,
       fill: true,
-      pointBackgroundColor: color,
-      pointBorderColor: "#fff",
-      pointBorderWidth: 2,
-      pointRadius: 4,
-      pointHoverRadius: 6,
+      pointRadius: 0,
+      pointHoverRadius: 0,
       spanGaps: true,
     };
   }
